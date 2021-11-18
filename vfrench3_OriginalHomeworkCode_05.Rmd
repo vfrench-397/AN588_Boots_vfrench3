@@ -251,7 +251,7 @@ We can see from these visualizations that the sample size is not effecting the m
 
 # Challenges 
 
-1. The bootstrapping estimates. Intially I was sampling the x and the y variable separately which was giving me estimates completely different from the model estimates. They still aren't perfectly aligned with the model estimates but they are much closer. 
+1. The bootstrapping estimates. Initially I was sampling the x and the y variable separately which was giving me estimates completely different from the model estimates. They still aren't perfectly aligned with the model estimates but they are much closer. 
 2. Generating a model. Originally I tried to write the function without the help of the lm function and I couldn't figure out how to do it. 
 3. I still don't get how you would utilize the formula argument if it was a character vector? 
 4. ggplot!! Specifically figuring out what format worked best for extracting the variables and figuring out how to ordering them in the plot. 
