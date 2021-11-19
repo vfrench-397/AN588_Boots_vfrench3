@@ -1,0 +1,261 @@
+---
+title: "vfrench3_PeerCommentary_martah"
+author: "Marta"
+date: "11/17/2021"
+output: html_document
+---
+
+# Homework 5: Boots for Days
+
+## Peer Commentary 
+
+Victoria and I meet up in Zoom to go over the hw together. I think her code is great, the major things we talked about was se() and CIs. In her work she was using the quantile function which we agreed might be less helpful than running full upper and lower CIs for each value. We also were confused about the difference bewteen the SE and SD values between the model and the sample data, in the end I asked around and I *think* the difference is intentional? I'm still confused why it is exactly half but I think that comes from including na's (btw Victoria you're right, lm automatically omits na's of the two values you're graphing, but for other functions like CI or quantile you would need to go in and individually remove NA's in your variables). Other than that, Victoria had great work! Thank you for your help with the coef() function, a life saver!! 
+
+## Bootstrapping Standard Errors and CIs for Linear Models 
+
+When we initially discussed the central limit theorem and confidence intervals, we showed how we could use bootstrapping to estimate standard errors and confidence intervals around certain parameter values, like the mean. Using bootstrapping, we could also do the same for estimating standard errors and CIs around regression parameters, such as β coefficients.
+
+```{r}
+library(curl)
+```
+
+[1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your β coeffiecients (slope and intercept).
+
+```{r}
+d <- curl('https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/master/AN588_Fall21/KamilarAndCooperData.csv')
+d <- read.csv(d, stringsAsFactors = FALSE, header = TRUE)
+```
+
+```{r}
+x <- log(d$Body_mass_female_mean)
+y <- log(d$HomeRange_km2)
+```
+
+```{r}
+m <- lm(y ~ x)
+summary(m)
+```
+
+```{r}
+c <- coef(m)
+c
+```
+
+[2] Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each β coefficient.
+
+```{r}
+set.seed(1)
+i.set <- NULL
+s.set <- NULL
+n <- 50
+for (i in 1:1000) {
+  #Sample the data rows so x and y measurements stay paired 
+    data <- d[sample(1:nrow(d), n, replace = TRUE),]
+   #log transform the variables
+    y <- log(data$HomeRange_km2)
+    x <- log(data$Body_mass_female_mean)
+    #Run a regression and extract the coefficients 
+    a <- as.data.frame(coef(lm(y~x)))
+    #Place the coefficients into their respective sets 
+    i.set[i] <- a[1,] #Intercept
+    s.set[i] <- a[2,] #Slope
+}
+```
+
+
+Estimate the standard error for each of your β coefficients as the standard deviation of the sampling distribution from your bootstrap 
+
+```{r}
+sd(i.set)
+sd(s.set)
+```
+
+How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in lm().
+
+```{r}
+f <- as.data.frame(coef(summary(m)))
+f[1,2] #intercept standard error estimate
+f[2,2] #slope standard error estimate
+```
+
+Both estimates from the model are not close to the estimates generated from bootstrapping? Even though they should be in theory. I think I did something wrong. 
+
+Determine the 95% CI for each of your β coefficients based on the appropriate quantiles from your sampling distribution.
+
+```{r}
+quantile(i.set, c(0.025, 0.975))
+quantile(s.set, c(0.025, 0.975))
+```
+
+ The estimate of ~ -9 for the intercept from the entire data set fits into this confidence interval
+ 
+ The estimate of ~ 1 for the slope from the entire data set fits into this confidence interval
+
+How does the latter compare to the 95% CI estimated from your entire dataset?
+
+```{r}
+confint(m, level = .95)
+```
+
+Much closer than the SE estimates but still some variation from the model. 
+
+## Extra Credit
+
+Write a FUNCTION that takes as its arguments a dataframe, “d”, a linear model, “m” (as a character string, e.g., “logHR~logBM”), a user-defined confidence interval level, “conf.level” (with default = 0.95), and a number of bootstrap replicates, “n” (with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
+
+```{r}
+linear.regression <- function(d, m, conf.level = 0.95, n = 1000, size = 50) {
+  #Run Linear Regression
+  model <- lm(formula = m, data = d, na.action = na.omit)
+  
+  #Extract Coefficients 
+  t <- as.data.frame(coef(summary(model)))
+  #Extract CIs for the estimates 
+  c <- as.data.frame(confint(model, level = conf.level))
+  #Generate a dataframe containing both the coefficients and the CIs 
+  return <- cbind(t,c)
+
+#Run Bootstrap
+i.set <- NULL
+s.set <- NULL
+for (i in 1:n) {
+  #Sample the data rows so x and y measurements stay paired 
+    data <- d[sample(1:nrow(d), size, replace = TRUE),]
+    #Run a regression and extract the coefficients 
+    a <- as.data.frame(coef(lm(formula = m, data = data)))
+    #Place the coefficients into their respective sets 
+    i.set[i] <- a[1,] #Intercept
+    s.set[i] <- a[2,] #Slope
+}
+
+#Estimate mean Beta coefficients from the sampling distribution 
+Intercept.estimate <- mean(i.set)
+Slope.estimate <- mean(s.set)
+#Estimate Standard error from sampling distribution by taking the standard deviation
+Intercept.SE <- sd(i.set)
+Slope.SE <- sd(s.set)
+#Estimate CIs from sampling distribution
+lower <- (1-conf.level)/2
+upper <- 1-((1-conf.level)/2)
+Intercept.CIs <- quantile(i.set, c(lower, upper))
+Slope.CIs <- quantile(s.set, c(lower, upper))
+
+#Construct the returned data frame 
+g <- t(data.frame(c(Intercept.estimate, Intercept.SE, Intercept.CIs), c(Slope.estimate, Slope.SE, Slope.CIs)))
+return <- cbind(g,return)
+rownames(return) <- c('Intercept', 'Slope')
+colnames(return) <- c('Sample.Estimate', 'Sample.SE', 'Sample.CIlwr', 'Sample.CIupr', 'Model.Estimate', 'Model.SE', 'Model.tvalue', 'Model.pvalue', 'Model.lwr', 'Model.upr')
+  
+retur <- return[, c(5,6,7,8,9,10,1,2,3,4)]
+return
+}
+```
+
+```{r}
+#Testing the function 
+r <- linear.regression(d = d, m = log(HomeRange_km2) ~ log(Body_mass_female_mean)) 
+r
+```
+
+## Extra Extra Credit 
+
+Graph each beta value from the linear model and its corresponding mean value, lower CI and upper CI from a bootstrap as a function of number of bootstraps from 10 to 200 by 10s. HINT: the beta value from the linear model will be the same for all bootstraps and the mean beta value may not differ that much!
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+#Run the linear regression for different sample sizes 10 to 200 by 10 
+models <- NULL
+for (i in seq(10,200,by =10)) {
+  models[[i]] <- linear.regression(d = d, m = log(HomeRange_km2) ~ log(Body_mass_female_mean), size = i)
+}
+#Extract the models out of the 200 elements generated 
+models <- models[seq(10,200,by =10)]
+```
+
+This is me trying to extract the appropriate information from the models list. But this returns a list object and you cannot plot lists in ggplot objects
+```{r}
+#Extract the beta value, mean estimate and CIs from the models for the intercept 
+Beta0 <- NULL
+for (i in 1:20) {
+Beta0[[i]] <- models[[i]][1,c(1,7,9,10)]
+}
+```
+
+```{r}
+#Extract the beta value, mean estimate and CIs from the models for the slope
+Beta1 <- NULL
+for (i in 1:20) {
+ Beta1[[i]] <- models[[i]][2,c(1,7,9,10)]
+}
+```
+
+So I decided to try the lapply function to create a dataframe. 
+
+```{r}
+#Creating a character vector so I can name the variables by their bootstrapping sample size.
+char <- as.character(seq(10,200, by = 10))
+```
+
+```{r}
+#Extracting the model estimate using the lapply function 
+est <- data.frame(lapply(models, `[[`, 1))
+#renaming the rows and columns so I can bind the individual element data frames
+rownames(est) <- c('Beta0.Est', 'Beta1.Est')
+colnames(est) <- char
+
+#repeat for each element 
+mean <- data.frame(lapply(models, `[[`, 7))
+rownames(mean) <- c('Beta0.mean', 'Beta1.mean')
+colnames(mean) <- char
+lwr <- data.frame(lapply(models, `[[`, 9))
+rownames(lwr) <- c('Beta0.lwr', 'Beta1.lwr')
+colnames(lwr) <- char
+upr <- data.frame(lapply(models, `[[`, 10))
+rownames(upr) <- c('Beta0.upr', 'Beta1.upr')
+colnames(upr) <- char
+#Bind element dataframes into one dataframe to use for ggplots 
+data <- as.data.frame(t(rbind(est, mean, lwr, upr)))
+#Adding in a variable of the numerical sequence because if I try to plot by rownames, ggplot will put them in 'alphabetical' versus 'numerical' order (x axis went 10,100,110,120,130, etc. instead of 10,20,30)
+data$Sample.size <- seq(10,200, by = 10)
+```
+
+```{r}
+#Create initial ggplot object and add in additional lines for each associated element
+g <- ggplot(data = data, aes(x = Sample.size, y = Beta0.lwr)) + 
+    geom_line(aes(color = 'red')) + 
+    geom_line(data = data, aes(x = Sample.size, y = Beta0.upr, color = 'red')) +
+    geom_line(data = data, aes(x = Sample.size, y = Beta0.Est, color = 'blue')) + 
+    geom_line(data = data, aes(x = Sample.size, y = Beta0.mean, color = 'green')) + 
+  labs(x = 'Bootstrap Sample Size', y = NULL) + 
+  scale_color_discrete(name="Line",
+                         breaks=c("blue", "green", "red"),
+                         labels=c("Beta value", "Estimated Mean", "Confidence Intervals"))
+g
+```
+
+```{r}
+#Repeat for Beta1 
+
+g <- ggplot(data = data, aes(x = Sample.size, y = Beta1.lwr)) + 
+    geom_line(aes(color = 'red')) + 
+    geom_line(data = data, aes(x = Sample.size, y = Beta1.upr, color = 'red')) +
+    geom_line(data = data, aes(x = Sample.size, y = Beta1.Est, color = 'blue')) + 
+    geom_line(data = data, aes(x = Sample.size, y = Beta1.mean, color = 'green')) + 
+  labs(x = 'Bootstrap Sample Size', y = NULL) + 
+  scale_color_discrete(name="Line",
+                         breaks=c("blue", "green", "red"),
+                         labels=c("Beta value", "Estimated Mean", "Confidence Intervals"))
+g
+```
+
+We can see from these visualizations that the sample size is not effecting the mean estimates but higher sample sizes do give us narrower confidence intervals. 
+
+# Challenges 
+
+1. The bootstrapping estimates. Intially I was sampling the x and the y variable separately which was giving me estimates completely different from the model estimates. They still aren't perfectly aligned with the model estimates but they are much closer. 
+2. Generating a model. Originally I tried to write the function without the help of the lm function and I couldn't figure out how to do it. 
+3. I still don't get how you would utilize the formula argument if it was a character vector? 
+4. ggplot!! Specifically figuring out what format worked best for extracting the variables and figuring out how to ordering them in the plot. 
