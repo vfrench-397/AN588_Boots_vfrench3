@@ -95,6 +95,8 @@ confint(m, level = .95)
 
 Much closer than the SE estimates but still some variation from the model. 
 
+*nice work! keep in mind the boot() function is also an option*
+
 ## Extra Credit
 
 Write a FUNCTION that takes as its arguments a dataframe, “d”, a linear model, “m” (as a character string, e.g., “logHR~logBM”), a user-defined confidence interval level, “conf.level” (with default = 0.95), and a number of bootstrap replicates, “n” (with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
@@ -248,6 +250,8 @@ g
 ```
 
 We can see from these visualizations that the sample size is not effecting the mean estimates but higher sample sizes do give us narrower confidence intervals. 
+
+*wow! Great!*
 
 # Challenges 
 
